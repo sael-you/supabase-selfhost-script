@@ -212,10 +212,83 @@ fi
 docker compose -p "$PROJECT_STACK" up -d
 
 # Ensure Studio re-reads .env (loads SUPABASE_* keys)
+echo "🔄 recreating Studio to apply final env…"
 docker compose -p "$PROJECT_STACK" up -d --force-recreate --no-deps studio
 
-docker compose -p "$PROJECT_STACK" exec -T studio env | \
-  grep -E 'SUPABASE_PUBLIC_URL|SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_KEY' || true
+# ---------- Wait for services to be ready ----------
+echo "⏳ waiting for services to be ready…"
+max_wait=60
+elapsed=0
+while [[ $elapsed -lt $max_wait ]]; do
+  if docker compose -p "$PROJECT_STACK" exec -T kong wget -q -O- http://rest:3000/rest/v1/ >/dev/null 2>&1; then
+    echo "✅ PostgREST is ready"
+    break
+  fi
+  sleep 2
+  elapsed=$((elapsed + 2))
+done
+if [[ $elapsed -ge $max_wait ]]; then
+  echo "⚠️  PostgREST did not respond within ${max_wait}s, continuing anyway…"
+fi
+
+# ---------- Validate Studio environment ----------
+echo "🔍 validating Studio environment…"
+studio_env_ok=true
+required_vars="SUPABASE_PUBLIC_URL SUPABASE_URL SUPABASE_ANON_KEY SUPABASE_SERVICE_KEY"
+for var in $required_vars; do
+  val=$(docker compose -p "$PROJECT_STACK" exec -T studio env 2>/dev/null | grep "^${var}=" | cut -d= -f2- || true)
+  if [[ -z "$val" ]]; then
+    echo "❌ Studio env missing: ${var}"
+    studio_env_ok=false
+  else
+    echo "✅ Studio env set: ${var}=${val:0:40}..."
+  fi
+done
+
+# Verify keys match
+studio_anon=$(docker compose -p "$PROJECT_STACK" exec -T studio env 2>/dev/null | grep '^SUPABASE_ANON_KEY=' | cut -d= -f2- || true)
+if [[ "$studio_anon" != "$ANON_JWT" ]]; then
+  echo "❌ Studio ANON_KEY mismatch!"
+  echo "   Expected: ${ANON_JWT:0:40}..."
+  echo "   Got:      ${studio_anon:0:40}..."
+  studio_env_ok=false
+fi
+
+if [[ "$studio_env_ok" == "false" ]]; then
+  echo ""
+  echo "❌ Studio environment validation failed!"
+  echo "   This means Studio will not be able to communicate with the API."
+  echo "   Try recreating the Studio container manually:"
+  echo "   cd ${DOCKER_DIR} && docker compose -p ${PROJECT_STACK} up -d --force-recreate studio"
+  exit 1
+fi
+
+# ---------- Health check: Storage bucket list via public domain ----------
+echo "🏥 testing Storage API via public domain…"
+# Wait a bit for Kong to be ready
+sleep 5
+
+storage_test=$(curl -sf -H "Authorization: Bearer ${ANON_JWT}" \
+  -H "apikey: ${ANON_JWT}" \
+  "https://${API_DOMAIN}/storage/v1/bucket" 2>&1 || echo "FAILED")
+
+if [[ "$storage_test" == *"FAILED"* ]] || [[ "$storage_test" != "["* ]]; then
+  echo "❌ Storage health check failed!"
+  echo "   URL: https://${API_DOMAIN}/storage/v1/bucket"
+  echo "   Response: ${storage_test:0:200}"
+  echo ""
+  echo "Diagnostics:"
+  echo "  1. Ensure Plesk reverse proxy is configured:"
+  echo "     ${API_DOMAIN} → http://127.0.0.1:${API_PORT}"
+  echo "  2. Check if Kong is listening:"
+  docker compose -p "$PROJECT_STACK" ps kong
+  echo "  3. Check Kong logs:"
+  docker compose -p "$PROJECT_STACK" logs --tail=20 kong
+  echo ""
+  echo "⚠️  Continuing anyway, but Storage may not work in Studio UI."
+else
+  echo "✅ Storage API is healthy (returned bucket list)"
+fi
 cat <<OUT
 
 =========================================================
