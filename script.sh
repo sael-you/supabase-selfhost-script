@@ -177,7 +177,9 @@ services:
       - "127.0.0.1:${STUDIO_PORT}:3000"
     environment:
       SUPABASE_PUBLIC_URL: "https://${API_DOMAIN}"
-      SUPABASE_URL: "https://${API_DOMAIN}"        # some Studio builds read this alias
+      SUPABASE_URL: "https://${API_DOMAIN}"
+      NEXT_PUBLIC_SUPABASE_URL: "https://${API_DOMAIN}"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${ANON_JWT}"
       SUPABASE_ANON_KEY: "${ANON_JWT}"
       SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
 
@@ -203,6 +205,8 @@ docker compose -p "$PROJECT_STACK" up -d
 # Ensure Studio re-reads .env (loads SUPABASE_* keys)
 docker compose -p "$PROJECT_STACK" up -d --force-recreate --no-deps studio
 
+docker compose -p "$PROJECT_STACK" exec -T studio env | \
+  grep -E 'SUPABASE_PUBLIC_URL|SUPABASE_URL|NEXT_PUBLIC_SUPABASE_URL|SUPABASE_ANON_KEY|SUPABASE_SERVICE_KEY' || true
 cat <<OUT
 
 =========================================================
