@@ -177,20 +177,20 @@ services:
       - "127.0.0.1:${API_PORT}:8000"
       - "127.0.0.1:${ADMIN_PORT}:8001"
 
-    studio:
-      ports:
-        - "127.0.0.1:${STUDIO_PORT}:3000"
-      environment:
-        # URLs (some builds read one, some the other)
-        SUPABASE_PUBLIC_URL: "https://${API_DOMAIN}"
-        SUPABASE_URL: "https://${API_DOMAIN}"
-        NEXT_PUBLIC_SUPABASE_URL: "https://${API_DOMAIN}"
+  studio:
+    ports:
+      - "127.0.0.1:${STUDIO_PORT}:3000"
+    environment:
+      # URLs (some builds read one, some the other)
+      SUPABASE_PUBLIC_URL: "https://${API_DOMAIN}"
+      SUPABASE_URL: "https://${API_DOMAIN}"
+      NEXT_PUBLIC_SUPABASE_URL: "https://${API_DOMAIN}"
 
-        # Keys (both legacy and NEXT_PUBLIC)
-        SUPABASE_ANON_KEY: "${ANON_JWT}"
-        SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
-        NEXT_PUBLIC_SUPABASE_ANON_KEY: "${ANON_JWT}"
-        NEXT_PUBLIC_SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
+      # Keys (both legacy and NEXT_PUBLIC)
+      SUPABASE_ANON_KEY: "${ANON_JWT}"
+      SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${ANON_JWT}"
+      NEXT_PUBLIC_SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
 
   supavisor:
     ports:
