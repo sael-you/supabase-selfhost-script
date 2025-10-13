@@ -62,14 +62,14 @@ echo "✅ ports: api:${API_PORT} admin:${ADMIN_PORT} studio:${STUDIO_PORT} pg:${
 echo "📦 cloning supabase repo…"
 git clone --depth=1 https://github.com/supabase/supabase.git "${REPO_DIR}"
 
-ccd "${DOCKER_DIR}"
+cd "${DOCKER_DIR}"
 cp -n .env.example .env || true
 
 # make compose namespace-able: remove ALL hard-coded container_name
 # (so -p "$PROJECT_STACK" prefixes containers per project)
 find . -maxdepth 1 -name 'docker-compose*.yml' -print0 \
   | xargs -0 sed -Ei '/^[[:space:]]*container_name:[[:space:]]*/d'
-  
+
 # Persist compose project name for manual docker compose usage too
 if grep -qE '^COMPOSE_PROJECT_NAME=' .env; then
   sed -i "s|^COMPOSE_PROJECT_NAME=.*|COMPOSE_PROJECT_NAME=${PROJECT_STACK}|" .env
