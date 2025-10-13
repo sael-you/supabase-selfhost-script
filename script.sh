@@ -171,12 +171,20 @@ services:
     ports:
       - "127.0.0.1:${API_PORT}:8000"
       - "127.0.0.1:${ADMIN_PORT}:8001"
+
   studio:
     ports:
       - "127.0.0.1:${STUDIO_PORT}:3000"
+    environment:
+      SUPABASE_PUBLIC_URL: "https://${API_DOMAIN}"
+      SUPABASE_URL: "https://${API_DOMAIN}"        # some Studio builds read this alias
+      SUPABASE_ANON_KEY: "${ANON_JWT}"
+      SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
+
   supavisor:
     ports:
       - "127.0.0.1:${POOLER_PORT}:6543"
+
   db:
     ports:
       - "127.0.0.1:${PG_PORT}:5432"
