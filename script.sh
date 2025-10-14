@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: /root/supabase-script/script.sh <project_slug> <api_domain> <studio_domain>
+# Usage: /root/supabase-script/script.sh <project_slug> <api_domain> <studio_domain> [smtp_host] [smtp_port] [smtp_user] [smtp_pass] [smtp_sender_name]
 
-[ $# -eq 3 ] || { echo "usage: $0 <project_slug> <api_domain> <studio_domain>"; exit 1; }
+if [[ $# -lt 3 ]] || [[ $# -eq 4 ]] || [[ $# -eq 5 ]] || [[ $# -eq 6 ]] || [[ $# -gt 8 ]]; then
+  echo "usage: $0 <project_slug> <api_domain> <studio_domain> [smtp_host smtp_port smtp_user smtp_pass smtp_sender_name]"
+  echo ""
+  echo "SMTP parameters are optional but must all be provided together (or none at all)"
+  echo "Example with SMTP:"
+  echo "  $0 myproject api.example.com studio.example.com smtp.ionos.fr 465 user@example.com 'password' 'My App'"
+  exit 1
+fi
+
 PROJECT="$1"; API_DOMAIN="$2"; STUDIO_DOMAIN="$3"
+
+# Optional SMTP parameters
+SMTP_HOST="${4:-}"
+SMTP_PORT="${5:-587}"
+SMTP_USER="${6:-}"
+SMTP_PASS="${7:-}"
+SMTP_SENDER_NAME="${8:-Supabase}"
+
+# Validate SMTP: either all provided or none
+if [[ -n "$SMTP_HOST" ]] && [[ -z "$SMTP_USER" || -z "$SMTP_PASS" ]]; then
+  echo "❌ Error: If SMTP host is provided, smtp_user and smtp_pass are required"
+  exit 1
+fi
 
 # Compose project name (used as namespace/prefix)
 PROJECT_STACK="$(echo "sb-${PROJECT}" | tr -cd '[:alnum:]-_')"
@@ -135,7 +156,15 @@ if [[ -z "$ANON_JWT" ]] || [[ -z "$SERVICE_JWT" ]]; then
   exit 1
 fi
 
-# ---------- .env writer ----------
+# ---------- Helper functions ----------
+# URL-encode special characters for use in connection strings
+url_encode() {
+  python3 - "$1" <<'PY'
+import urllib.parse, sys
+print(urllib.parse.quote(sys.argv[1], safe=''), end='')
+PY
+}
+
 set_env() {
   local k="$1" v="$2"
   if grep -qE "^${k}=" .env; then
@@ -162,7 +191,21 @@ set_env GOTRUE_API_EXTERNAL_URL   "https://${API_DOMAIN}/auth/v1"
 set_env GOTRUE_URI_ALLOW_LIST     "https://${API_DOMAIN},https://${STUDIO_DOMAIN}"
 
 # Mailer/user flags
-set_env GOTRUE_MAILER_AUTOCONFIRM "true"
+if [[ -n "$SMTP_HOST" ]]; then
+  echo "📧 configuring SMTP (${SMTP_HOST}:${SMTP_PORT})…"
+  set_env GOTRUE_MAILER_AUTOCONFIRM         "false"
+  set_env GOTRUE_SMTP_HOST                  "${SMTP_HOST}"
+  set_env GOTRUE_SMTP_PORT                  "${SMTP_PORT}"
+  set_env GOTRUE_SMTP_USER                  "${SMTP_USER}"
+  set_env GOTRUE_SMTP_PASS                  "${SMTP_PASS}"
+  set_env GOTRUE_SMTP_ADMIN_EMAIL           "${SMTP_USER}"
+  set_env GOTRUE_SMTP_SENDER_NAME           "${SMTP_SENDER_NAME}"
+  set_env GOTRUE_MAILER_SECURE_EMAIL_CHANGE_ENABLED "true"
+  set_env GOTRUE_MAILER_EXTERNAL_HOSTS      "${API_DOMAIN}"
+else
+  echo "📧 SMTP not configured - using auto-confirm mode"
+  set_env GOTRUE_MAILER_AUTOCONFIRM "true"
+fi
 set_env GOTRUE_DISABLE_SIGNUP     "false"
 
 # Storage/Auth/PostgREST secrets + internal URLs
@@ -172,7 +215,10 @@ set_env STORAGE_JWT_SECRET        "${JWT_SECRET}"
 set_env GOTRUE_JWT_SECRET         "${JWT_SECRET}"
 set_env GOTRUE_SITE_URL           "https://${API_DOMAIN}"
 set_env STORAGE_POSTGREST_URL     "http://rest:3000"
-set_env STORAGE_DATABASE_URL      "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres"
+
+# URL-encode postgres password for connection string
+POSTGRES_PASSWORD_ENCODED=$(url_encode "${POSTGRES_PASSWORD}")
+set_env STORAGE_DATABASE_URL      "postgresql://postgres:${POSTGRES_PASSWORD_ENCODED}@db:5432/postgres"
 
 # Studio needs these to talk to the right API with valid tokens
 set_env SUPABASE_ANON_KEY         "${ANON_JWT}"
@@ -213,8 +259,14 @@ services:
       GOTRUE_SITE_URL: "https://API_DOMAIN_PLACEHOLDER"
       GOTRUE_API_EXTERNAL_URL: "https://API_DOMAIN_PLACEHOLDER/auth/v1"
       GOTRUE_URI_ALLOW_LIST: "https://API_DOMAIN_PLACEHOLDER,https://STUDIO_DOMAIN_PLACEHOLDER"
-      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "SMTP_AUTOCONFIRM_PLACEHOLDER"
       GOTRUE_MAILER_EXTERNAL_HOSTS: "API_DOMAIN_PLACEHOLDER"
+      GOTRUE_SMTP_HOST: "SMTP_HOST_PLACEHOLDER"
+      GOTRUE_SMTP_PORT: "SMTP_PORT_PLACEHOLDER"
+      GOTRUE_SMTP_USER: "SMTP_USER_PLACEHOLDER"
+      GOTRUE_SMTP_PASS: "SMTP_PASS_PLACEHOLDER"
+      GOTRUE_SMTP_ADMIN_EMAIL: "SMTP_USER_PLACEHOLDER"
+      GOTRUE_SMTP_SENDER_NAME: "SMTP_SENDER_NAME_PLACEHOLDER"
 
   supavisor:
     ports:
@@ -239,6 +291,25 @@ ANON_JWT_ESCAPED=$(printf '%s\n' "$ANON_JWT" | sed 's/[&/\]/\\&/g')
 SERVICE_JWT_ESCAPED=$(printf '%s\n' "$SERVICE_JWT" | sed 's/[&/\]/\\&/g')
 sed -i "s@ANON_JWT_PLACEHOLDER@${ANON_JWT_ESCAPED}@g" docker-compose.override.yml
 sed -i "s@SERVICE_JWT_PLACEHOLDER@${SERVICE_JWT_ESCAPED}@g" docker-compose.override.yml
+
+# SMTP placeholders
+if [[ -n "$SMTP_HOST" ]]; then
+  SMTP_PASS_ESCAPED=$(printf '%s\n' "$SMTP_PASS" | sed 's/[&/\]/\\&/g')
+  sed -i "s@SMTP_AUTOCONFIRM_PLACEHOLDER@false@g" docker-compose.override.yml
+  sed -i "s@SMTP_HOST_PLACEHOLDER@${SMTP_HOST}@g" docker-compose.override.yml
+  sed -i "s@SMTP_PORT_PLACEHOLDER@${SMTP_PORT}@g" docker-compose.override.yml
+  sed -i "s@SMTP_USER_PLACEHOLDER@${SMTP_USER}@g" docker-compose.override.yml
+  sed -i "s@SMTP_PASS_PLACEHOLDER@${SMTP_PASS_ESCAPED}@g" docker-compose.override.yml
+  sed -i "s@SMTP_SENDER_NAME_PLACEHOLDER@${SMTP_SENDER_NAME}@g" docker-compose.override.yml
+else
+  # Remove SMTP env vars if not configured
+  sed -i "s@SMTP_AUTOCONFIRM_PLACEHOLDER@true@g" docker-compose.override.yml
+  sed -i "/SMTP_HOST_PLACEHOLDER/d" docker-compose.override.yml
+  sed -i "/SMTP_PORT_PLACEHOLDER/d" docker-compose.override.yml
+  sed -i "/SMTP_USER_PLACEHOLDER/d" docker-compose.override.yml
+  sed -i "/SMTP_PASS_PLACEHOLDER/d" docker-compose.override.yml
+  sed -i "/SMTP_SENDER_NAME_PLACEHOLDER/d" docker-compose.override.yml
+fi
 
 echo "🔍 Debug: Checking SERVICE_JWT replacement:"
 grep "SERVICE_KEY:" docker-compose.override.yml | head -2
@@ -374,6 +445,25 @@ Postgres:
   port     : ${PG_PORT}
   user     : postgres
   password : ${POSTGRES_PASSWORD}
+OUT
+
+if [[ -n "$SMTP_HOST" ]]; then
+  cat <<OUT
+SMTP:
+  host     : ${SMTP_HOST}
+  port     : ${SMTP_PORT}
+  user     : ${SMTP_USER}
+  sender   : ${SMTP_SENDER_NAME}
+  status   : ✅ Email verification ENABLED
+OUT
+else
+  cat <<OUT
+SMTP:
+  status   : ⚠️  Auto-confirm mode (no email verification)
+OUT
+fi
+
+cat <<OUT
 Config saved: ${DOCKER_DIR}/.env
 =========================================================
 OUT
