@@ -167,10 +167,10 @@ PY
 
 set_env() {
   local k="$1" v="$2"
-  # Escape special characters for sed
-  local v_escaped=$(printf '%s\n' "$v" | sed 's/[&/\|]/\\&/g')
   if grep -qE "^${k}=" .env; then
-    sed -i "s|^${k}=.*|${k}=${v_escaped}|" .env
+    # Delete the old line and append the new one to avoid sed escaping issues
+    sed -i "/^${k}=/d" .env
+    echo "${k}=${v}" >> .env
   else
     echo "${k}=${v}" >> .env
   fi
