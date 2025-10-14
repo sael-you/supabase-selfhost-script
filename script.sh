@@ -170,36 +170,52 @@ mkdir -p volumes/storage
 chown -R 1000:1000 volumes/storage || true
 
 # ---------- Compose override (loopback ports only; NO container_name anywhere) ----------
-cat > docker-compose.override.yml <<YAML
+cat > docker-compose.override.yml <<'YAML'
+version: "3.8"
 services:
   kong:
     ports:
-      - "127.0.0.1:${API_PORT}:8000"
-      - "127.0.0.1:${ADMIN_PORT}:8001"
+      - "127.0.0.1:API_PORT_PLACEHOLDER:8000"
+      - "127.0.0.1:ADMIN_PORT_PLACEHOLDER:8001"
 
   studio:
     ports:
-      - "127.0.0.1:${STUDIO_PORT}:3000"
+      - "127.0.0.1:STUDIO_PORT_PLACEHOLDER:3000"
     environment:
-      # URLs (some builds read one, some the other)
-      SUPABASE_PUBLIC_URL: "https://${API_DOMAIN}"
-      SUPABASE_URL: "https://${API_DOMAIN}"
-      NEXT_PUBLIC_SUPABASE_URL: "https://${API_DOMAIN}"
-
-      # Keys (both legacy and NEXT_PUBLIC)
-      SUPABASE_ANON_KEY: "${ANON_JWT}"
-      SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
-      NEXT_PUBLIC_SUPABASE_ANON_KEY: "${ANON_JWT}"
-      NEXT_PUBLIC_SUPABASE_SERVICE_KEY: "${SERVICE_JWT}"
+      SUPABASE_PUBLIC_URL: "https://API_DOMAIN_PLACEHOLDER"
+      SUPABASE_URL: "https://API_DOMAIN_PLACEHOLDER"
+      NEXT_PUBLIC_SUPABASE_URL: "https://API_DOMAIN_PLACEHOLDER"
+      SUPABASE_ANON_KEY: "ANON_JWT_PLACEHOLDER"
+      SUPABASE_SERVICE_KEY: "SERVICE_JWT_PLACEHOLDER"
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: "ANON_JWT_PLACEHOLDER"
+      NEXT_PUBLIC_SUPABASE_SERVICE_KEY: "SERVICE_JWT_PLACEHOLDER"
 
   supavisor:
     ports:
-      - "127.0.0.1:${POOLER_PORT}:6543"
+      - "127.0.0.1:POOLER_PORT_PLACEHOLDER:6543"
 
   db:
     ports:
-      - "127.0.0.1:${PG_PORT}:5432"
+      - "127.0.0.1:PG_PORT_PLACEHOLDER:5432"
 YAML
+
+# Replace placeholders with actual values
+sed -i "s|API_PORT_PLACEHOLDER|${API_PORT}|g" docker-compose.override.yml
+sed -i "s|ADMIN_PORT_PLACEHOLDER|${ADMIN_PORT}|g" docker-compose.override.yml
+sed -i "s|STUDIO_PORT_PLACEHOLDER|${STUDIO_PORT}|g" docker-compose.override.yml
+sed -i "s|POOLER_PORT_PLACEHOLDER|${POOLER_PORT}|g" docker-compose.override.yml
+sed -i "s|PG_PORT_PLACEHOLDER|${PG_PORT}|g" docker-compose.override.yml
+sed -i "s|API_DOMAIN_PLACEHOLDER|${API_DOMAIN}|g" docker-compose.override.yml
+sed -i "s|ANON_JWT_PLACEHOLDER|${ANON_JWT}|g" docker-compose.override.yml
+sed -i "s|SERVICE_JWT_PLACEHOLDER|${SERVICE_JWT}|g" docker-compose.override.yml
+
+# Verify override file is valid YAML and contains our env vars
+if ! grep -q "SUPABASE_SERVICE_KEY:" docker-compose.override.yml; then
+  echo "❌ docker-compose.override.yml is missing SUPABASE_SERVICE_KEY!"
+  cat docker-compose.override.yml
+  exit 1
+fi
+echo "✅ docker-compose.override.yml created successfully"
 
 echo "🚀 starting containers…"
 docker compose -p "$PROJECT_STACK" pull
