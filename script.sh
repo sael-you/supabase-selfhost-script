@@ -170,6 +170,7 @@ set_env PGRST_DB_SCHEMAS          "public,storage,graphql_public"
 set_env PGRST_JWT_SECRET          "${JWT_SECRET}"
 set_env STORAGE_JWT_SECRET        "${JWT_SECRET}"
 set_env GOTRUE_JWT_SECRET         "${JWT_SECRET}"
+set_env GOTRUE_SITE_URL           "https://${API_DOMAIN}"
 set_env STORAGE_POSTGREST_URL     "http://rest:3000"
 set_env STORAGE_DATABASE_URL      "postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/postgres"
 
