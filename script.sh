@@ -210,7 +210,9 @@ services:
 
   auth:
     environment:
+      GOTRUE_SITE_URL: "https://API_DOMAIN_PLACEHOLDER"
       GOTRUE_API_EXTERNAL_URL: "https://API_DOMAIN_PLACEHOLDER/auth/v1"
+      GOTRUE_URI_ALLOW_LIST: "https://API_DOMAIN_PLACEHOLDER,https://STUDIO_DOMAIN_PLACEHOLDER"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_MAILER_EXTERNAL_HOSTS: "API_DOMAIN_PLACEHOLDER"
 
@@ -230,6 +232,7 @@ sed -i "s@STUDIO_PORT_PLACEHOLDER@${STUDIO_PORT}@g" docker-compose.override.yml
 sed -i "s@POOLER_PORT_PLACEHOLDER@${POOLER_PORT}@g" docker-compose.override.yml
 sed -i "s@PG_PORT_PLACEHOLDER@${PG_PORT}@g" docker-compose.override.yml
 sed -i "s@API_DOMAIN_PLACEHOLDER@${API_DOMAIN}@g" docker-compose.override.yml
+sed -i "s@STUDIO_DOMAIN_PLACEHOLDER@${STUDIO_DOMAIN}@g" docker-compose.override.yml
 
 # For JWTs, escape special characters to avoid sed issues
 ANON_JWT_ESCAPED=$(printf '%s\n' "$ANON_JWT" | sed 's/[&/\]/\\&/g')
