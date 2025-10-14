@@ -294,18 +294,20 @@ SERVICE_JWT_ESCAPED=$(printf '%s\n' "$SERVICE_JWT" | sed 's/[&/\]/\\&/g')
 sed -i "s@ANON_JWT_PLACEHOLDER@${ANON_JWT_ESCAPED}@g" docker-compose.override.yml
 sed -i "s@SERVICE_JWT_PLACEHOLDER@${SERVICE_JWT_ESCAPED}@g" docker-compose.override.yml
 
-# SMTP placeholders
+# SMTP placeholders - use | as delimiter to avoid conflicts with @ in email addresses
 if [[ -n "$SMTP_HOST" ]]; then
-  SMTP_PASS_ESCAPED=$(printf '%s\n' "$SMTP_PASS" | sed 's/[&/\]/\\&/g')
-  sed -i "s@SMTP_AUTOCONFIRM_PLACEHOLDER@false@g" docker-compose.override.yml
-  sed -i "s@SMTP_HOST_PLACEHOLDER@${SMTP_HOST}@g" docker-compose.override.yml
-  sed -i "s@SMTP_PORT_PLACEHOLDER@${SMTP_PORT}@g" docker-compose.override.yml
-  sed -i "s@SMTP_USER_PLACEHOLDER@${SMTP_USER}@g" docker-compose.override.yml
-  sed -i "s@SMTP_PASS_PLACEHOLDER@${SMTP_PASS_ESCAPED}@g" docker-compose.override.yml
-  sed -i "s@SMTP_SENDER_NAME_PLACEHOLDER@${SMTP_SENDER_NAME}@g" docker-compose.override.yml
+  SMTP_PASS_ESCAPED=$(printf '%s\n' "$SMTP_PASS" | sed 's/[&/\|]/\\&/g')
+  SMTP_USER_ESCAPED=$(printf '%s\n' "$SMTP_USER" | sed 's/[&/\|]/\\&/g')
+  SMTP_SENDER_ESCAPED=$(printf '%s\n' "$SMTP_SENDER_NAME" | sed 's/[&/\|]/\\&/g')
+  sed -i "s|SMTP_AUTOCONFIRM_PLACEHOLDER|false|g" docker-compose.override.yml
+  sed -i "s|SMTP_HOST_PLACEHOLDER|${SMTP_HOST}|g" docker-compose.override.yml
+  sed -i "s|SMTP_PORT_PLACEHOLDER|${SMTP_PORT}|g" docker-compose.override.yml
+  sed -i "s|SMTP_USER_PLACEHOLDER|${SMTP_USER_ESCAPED}|g" docker-compose.override.yml
+  sed -i "s|SMTP_PASS_PLACEHOLDER|${SMTP_PASS_ESCAPED}|g" docker-compose.override.yml
+  sed -i "s|SMTP_SENDER_NAME_PLACEHOLDER|${SMTP_SENDER_ESCAPED}|g" docker-compose.override.yml
 else
   # Remove SMTP env vars if not configured
-  sed -i "s@SMTP_AUTOCONFIRM_PLACEHOLDER@true@g" docker-compose.override.yml
+  sed -i "s|SMTP_AUTOCONFIRM_PLACEHOLDER|true|g" docker-compose.override.yml
   sed -i "/SMTP_HOST_PLACEHOLDER/d" docker-compose.override.yml
   sed -i "/SMTP_PORT_PLACEHOLDER/d" docker-compose.override.yml
   sed -i "/SMTP_USER_PLACEHOLDER/d" docker-compose.override.yml
