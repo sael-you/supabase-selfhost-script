@@ -118,6 +118,15 @@ PY
 )
 EOF
 
+# Debug: verify JWTs were generated
+echo "🔍 Generated JWTs:"
+echo "   ANON_JWT length: ${#ANON_JWT}"
+echo "   SERVICE_JWT length: ${#SERVICE_JWT}"
+if [[ -z "$SERVICE_JWT" ]]; then
+  echo "❌ SERVICE_JWT is empty!"
+  exit 1
+fi
+
 # ---------- .env writer ----------
 set_env() {
   local k="$1" v="$2"
@@ -199,15 +208,22 @@ services:
       - "127.0.0.1:PG_PORT_PLACEHOLDER:5432"
 YAML
 
-# Replace placeholders with actual values
-sed -i "s|API_PORT_PLACEHOLDER|${API_PORT}|g" docker-compose.override.yml
-sed -i "s|ADMIN_PORT_PLACEHOLDER|${ADMIN_PORT}|g" docker-compose.override.yml
-sed -i "s|STUDIO_PORT_PLACEHOLDER|${STUDIO_PORT}|g" docker-compose.override.yml
-sed -i "s|POOLER_PORT_PLACEHOLDER|${POOLER_PORT}|g" docker-compose.override.yml
-sed -i "s|PG_PORT_PLACEHOLDER|${PG_PORT}|g" docker-compose.override.yml
-sed -i "s|API_DOMAIN_PLACEHOLDER|${API_DOMAIN}|g" docker-compose.override.yml
-sed -i "s|ANON_JWT_PLACEHOLDER|${ANON_JWT}|g" docker-compose.override.yml
-sed -i "s|SERVICE_JWT_PLACEHOLDER|${SERVICE_JWT}|g" docker-compose.override.yml
+# Replace placeholders with actual values (use @ as delimiter to avoid issues with / in JWTs)
+sed -i "s@API_PORT_PLACEHOLDER@${API_PORT}@g" docker-compose.override.yml
+sed -i "s@ADMIN_PORT_PLACEHOLDER@${ADMIN_PORT}@g" docker-compose.override.yml
+sed -i "s@STUDIO_PORT_PLACEHOLDER@${STUDIO_PORT}@g" docker-compose.override.yml
+sed -i "s@POOLER_PORT_PLACEHOLDER@${POOLER_PORT}@g" docker-compose.override.yml
+sed -i "s@PG_PORT_PLACEHOLDER@${PG_PORT}@g" docker-compose.override.yml
+sed -i "s@API_DOMAIN_PLACEHOLDER@${API_DOMAIN}@g" docker-compose.override.yml
+
+# For JWTs, escape special characters to avoid sed issues
+ANON_JWT_ESCAPED=$(printf '%s\n' "$ANON_JWT" | sed 's/[&/\]/\\&/g')
+SERVICE_JWT_ESCAPED=$(printf '%s\n' "$SERVICE_JWT" | sed 's/[&/\]/\\&/g')
+sed -i "s@ANON_JWT_PLACEHOLDER@${ANON_JWT_ESCAPED}@g" docker-compose.override.yml
+sed -i "s@SERVICE_JWT_PLACEHOLDER@${SERVICE_JWT_ESCAPED}@g" docker-compose.override.yml
+
+echo "🔍 Debug: Checking SERVICE_JWT replacement:"
+grep "SERVICE_KEY:" docker-compose.override.yml | head -2
 
 # Verify override file is valid YAML and contains our env vars
 if ! grep -q "SUPABASE_SERVICE_KEY:" docker-compose.override.yml; then
