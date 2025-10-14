@@ -14,7 +14,7 @@
         .email-container {
             max-width: 600px;
             margin: 40px auto;
-            background-color: #ffffff;
+            background-color: #ffffff !important;
             border-radius: 8px;
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
@@ -29,7 +29,7 @@
             margin-bottom: 20px;
         }
         .email-header h1 {
-            color: #ffffff;
+            color: #ffffff !important;
             margin: 0;
             font-size: 28px;
             font-weight: 600;
@@ -54,7 +54,7 @@
             display: inline-block;
             padding: 14px 32px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
+            color: #ffffff !important;
             text-decoration: none;
             border-radius: 6px;
             font-weight: 600;
@@ -62,6 +62,7 @@
             transition: transform 0.2s;
         }
         .cta-button:hover {
+            color: #ffffff !important;
             transform: translateY(-2px);
         }
         .button-container {
@@ -128,7 +129,7 @@
             <p>To complete this change, please click the button below to confirm your new email address:</p>
 
             <div class="button-container">
-                <a href="{{ .ConfirmationURL }}" class="cta-button">Confirm Email Change</a>
+                <a href="{{ .ConfirmationURL }}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Confirm Email Change</a>
             </div>
 
             <p>This link will expire in 24 hours for security reasons.</p>
