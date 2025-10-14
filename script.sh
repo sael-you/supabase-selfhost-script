@@ -215,7 +215,15 @@ if ! grep -q "SUPABASE_SERVICE_KEY:" docker-compose.override.yml; then
   cat docker-compose.override.yml
   exit 1
 fi
-echo "✅ docker-compose.override.yml created successfully"
+
+# Debug: show what we wrote to the override
+echo "✅ docker-compose.override.yml created"
+echo "🔍 Verifying Studio env block in override:"
+grep -A 8 "studio:" docker-compose.override.yml | grep -E "SUPABASE_SERVICE_KEY|SUPABASE_ANON_KEY" || {
+  echo "❌ Keys not found in override file!"
+  cat docker-compose.override.yml
+  exit 1
+}
 
 echo "🚀 starting containers…"
 docker compose -p "$PROJECT_STACK" pull
@@ -230,6 +238,12 @@ docker compose -p "$PROJECT_STACK" up -d
 # Ensure Studio re-reads .env (loads SUPABASE_* keys)
 echo "🔄 recreating Studio to apply final env…"
 docker compose -p "$PROJECT_STACK" up -d --force-recreate --no-deps studio
+
+# Debug: check what docker compose resolved for Studio
+echo "🔍 Checking what docker compose config resolved for Studio environment:"
+docker compose -p "$PROJECT_STACK" config | grep -A 30 "studio:" | grep -E "SUPABASE_SERVICE_KEY|SUPABASE_ANON_KEY" || {
+  echo "⚠️  Keys not in docker compose config output!"
+}
 
 # ---------- Wait for services to be ready ----------
 echo "⏳ waiting for services to be ready…"
