@@ -107,23 +107,31 @@ if ! python3 -c "import jwt" 2>/dev/null; then
   fi
 fi
 
-read -r ANON_JWT SERVICE_JWT <<EOF
-$(python3 - <<PY
+# Generate JWTs - capture each on separate lines
+ANON_JWT=$(python3 - <<PY
 import jwt, time
 secret = "${JWT_SECRET}"
 now=int(time.time()); exp=now+60*60*24*365*10
-def enc(role): return jwt.encode({"role":role,"iss":"supabase","iat":now,"exp":exp}, secret, algorithm="HS256")
-print(enc("anon")); print(enc("service_role"))
+print(jwt.encode({"role":"anon","iss":"supabase","iat":now,"exp":exp}, secret, algorithm="HS256"))
 PY
 )
-EOF
+
+SERVICE_JWT=$(python3 - <<PY
+import jwt, time
+secret = "${JWT_SECRET}"
+now=int(time.time()); exp=now+60*60*24*365*10
+print(jwt.encode({"role":"service_role","iss":"supabase","iat":now,"exp":exp}, secret, algorithm="HS256"))
+PY
+)
 
 # Debug: verify JWTs were generated
 echo "🔍 Generated JWTs:"
 echo "   ANON_JWT length: ${#ANON_JWT}"
 echo "   SERVICE_JWT length: ${#SERVICE_JWT}"
-if [[ -z "$SERVICE_JWT" ]]; then
-  echo "❌ SERVICE_JWT is empty!"
+if [[ -z "$ANON_JWT" ]] || [[ -z "$SERVICE_JWT" ]]; then
+  echo "❌ JWT generation failed!"
+  echo "   ANON_JWT: ${ANON_JWT:0:50}..."
+  echo "   SERVICE_JWT: ${SERVICE_JWT:0:50}..."
   exit 1
 fi
 
