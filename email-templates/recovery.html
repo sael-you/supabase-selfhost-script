@@ -123,7 +123,7 @@
             <p>We received a request to reset the password for your account ({{ .Email }}). Click the button below to create a new password:</p>
 
             <div class="button-container">
-                <a href="{{ .ConfirmationURL }}" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Reset Password</a>
+                <a href="{{ .ConfirmationURL }}/auth/reset-password" class="cta-button" style="color: #ffffff !important; text-decoration: none;">Reset Password</a>
             </div>
 
             <p>This link will expire in 1 hour for security reasons.</p>
@@ -135,7 +135,7 @@
             <div class="alternative-link">
                 <strong>Button not working?</strong><br>
                 Copy and paste this link into your browser:<br>
-                <a href="{{ .ConfirmationURL }}">{{ .ConfirmationURL }}</a>
+                <a href="{{ .ConfirmationURL }}/auth/reset-password">{{ .ConfirmationURL }}/auth/reset-password</a>
             </div>
         </div>
 
